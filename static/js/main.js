@@ -27,7 +27,13 @@ const newChatBtn      = document.getElementById("newChatBtn");
 
 // ── Utilities ──────────────────────────────────────────────────────────
 function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function parseMarkdown(text) {
@@ -228,7 +234,7 @@ pdfInput.addEventListener("change", () => {
   const file = pdfInput.files[0];
   if (!file) return;
   if (!file.name.toLowerCase().endsWith(".pdf")) {
-    alert("Please select a PDF file.");
+    appendMessage("assistant", "⚠️ Please select a PDF file.");
     pdfInput.value = "";
     return;
   }

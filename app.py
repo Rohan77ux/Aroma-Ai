@@ -21,6 +21,12 @@ UPLOAD_FOLDER.mkdir(exist_ok=True)
 ALLOWED_EXTENSIONS = {"pdf"}
 MAX_PDF_CHARS = 40000  # limit context sent to the model
 
+# Maximum number of recent messages to include in the chat context.
+# PDF Q&A uses a shorter window (PDF_CHAT_HISTORY_LIMIT) because the PDF
+# content already consumes a large portion of the context window.
+CHAT_HISTORY_LIMIT = 40
+PDF_CHAT_HISTORY_LIMIT = 10
+
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # In-memory conversation store keyed by session id
@@ -72,7 +78,7 @@ def chat():
         "Answer questions clearly and thoroughly. Use markdown formatting where appropriate."
     )
 
-    messages = [{"role": "system", "content": system_prompt}] + history[-40:]
+    messages = [{"role": "system", "content": system_prompt}] + history[-CHAT_HISTORY_LIMIT:]
 
     try:
         response = client.chat.completions.create(
@@ -84,10 +90,10 @@ def chat():
         assistant_message = response.choices[0].message.content
         history.append({"role": "assistant", "content": assistant_message})
         return jsonify({"reply": assistant_message, "session_id": session_id})
-    except Exception as exc:
+    except Exception:
         # Remove the user message we just appended so history stays consistent
         history.pop()
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Failed to get a response from the AI service. Please try again."}), 500
 
 
 @app.route("/api/upload-pdf", methods=["POST"])
@@ -108,8 +114,8 @@ def upload_pdf():
 
     try:
         pdf_text = extract_pdf_text(filepath)
-    except Exception as exc:
-        return jsonify({"error": f"Could not read PDF: {exc}"}), 500
+    except Exception:
+        return jsonify({"error": "Could not read the PDF. Ensure it is a valid, non-encrypted PDF file."}), 500
     finally:
         try:
             filepath.unlink()
@@ -145,7 +151,7 @@ def upload_pdf():
         "Use markdown formatting where appropriate."
     )
 
-    messages = [{"role": "system", "content": system_prompt}] + history[-10:]
+    messages = [{"role": "system", "content": system_prompt}] + history[-PDF_CHAT_HISTORY_LIMIT:]
 
     try:
         response = client.chat.completions.create(
@@ -157,9 +163,9 @@ def upload_pdf():
         assistant_message = response.choices[0].message.content
         history.append({"role": "assistant", "content": assistant_message})
         return jsonify({"reply": assistant_message, "session_id": session_id})
-    except Exception as exc:
+    except Exception:
         history.pop()
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Failed to get a response from the AI service. Please try again."}), 500
 
 
 @app.route("/api/clear", methods=["POST"])
@@ -172,4 +178,4 @@ def clear_conversation():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)
