@@ -30,10 +30,14 @@ function generateId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  // Fallback for older browsers
-  const arr = new Uint8Array(16);
-  crypto.getRandomValues(arr);
-  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+  // Fallback for older browsers that have getRandomValues but not randomUUID
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // Last-resort fallback (very old browsers)
+  return Date.now().toString(36) + performance.now().toString(36).replace(".", "");
 }
 
 function parseMarkdown(text) {
@@ -256,11 +260,19 @@ function clearPdf() {
 
 // ── New chat ───────────────────────────────────────────────────────────
 newChatBtn.addEventListener("click", async () => {
-  await fetch("/api/clear", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId }),
-  });
+  try {
+    const response = await fetch("/api/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    if (!response.ok) {
+      throw new Error("Server error");
+    }
+  } catch {
+    appendMessage("assistant", "⚠️ Could not clear the conversation on the server. Please refresh the page and try again.");
+    return;
+  }
   sessionId = generateId();
   localStorage.setItem(SESSION_KEY, sessionId);
   messagesWrapper.innerHTML = "";

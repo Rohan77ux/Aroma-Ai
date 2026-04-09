@@ -115,7 +115,7 @@ def upload_pdf():
     try:
         pdf_text = extract_pdf_text(filepath)
     except Exception:
-        return jsonify({"error": "Could not read the PDF. Ensure it is a valid, non-encrypted PDF file."}), 500
+        return jsonify({"error": "Could not read the PDF. Ensure it is a valid, readable PDF file."}), 500
     finally:
         try:
             filepath.unlink()
