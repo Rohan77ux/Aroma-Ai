@@ -15,3 +15,10 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+
+# Temp files
+temp_*.pdf
+
+# Qdrant storage
+qdrant_storage/
