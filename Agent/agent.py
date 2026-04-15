@@ -1,8 +1,13 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_openai import ChatOpenAI , OpenAIEmbeddings
+
+from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+
+qdrant_client = QdrantClient(url="http://localhost:6333")
 
 llm = ChatOpenAI(
     model="gpt-3.5-turbo",
@@ -50,15 +55,70 @@ Follow these rules strictly:
 
 message.append(SystemMessage(content=systemPrompt))
 
+def retrieve_context(query, file_id):
+    """RAG retrieval from Qdrant"""
 
-def chat(msg):
-    message.append(HumanMessage(content=msg))
+    vectorstore = QdrantVectorStore(
+        client=qdrant_client,
+        collection_name="docs",
+        embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
+    )
+
+    retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 5,
+        "fetch_k": 10,
+        "lambda_mult": 0.5,
+        "filter": {
+            "must": [
+                {
+                    "key": "metadata.file_id",  
+                    "match": {"value": file_id}
+                }
+            ]
+        }
+    }
+)
+
+    docs = retriever.invoke(query)
+   
+
+    context = "\n\n".join([doc.page_content for doc in docs])
+
+    return context
+
+def chat(msg,file_id=None):
+   
 
     try:
+        
+        if file_id:
+            context = retrieve_context(msg, file_id)
+
+            prompt = f"""
+You are an AI assistant.
+
+Answer the question using the context below.
+if user query ia also give the summary or explain all the topic in detail or in short then explain.
+
+If answer is not found, say "Not found in document".
+
+Context:
+{context}
+
+Question:
+{msg}
+"""
+
+            message.append(HumanMessage(content=prompt))
+        else:
+            message.append(HumanMessage(content=msg))  
+             
         response = llm.invoke(message)  
         reply = response.content        
 
-        message.append(response)        
+        message.append(AIMessage (content=reply) )        
 
         return reply
 

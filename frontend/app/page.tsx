@@ -15,12 +15,48 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
 
+  // NEW STATES
+  const [file, setFile] = useState<File | null>(null);
+  const [fileId, setFileId] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // FILE UPLOAD
+  const uploadFile = async () => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("http://127.0.0.1:8000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      setFileId(data.file_id);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: `📄 File uploaded successfully (ID: ${data.file_id})`,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: "⚠️ File upload failed" },
+      ]);
+    }
+  };
+
+  // SEND MESSAGE
   const sendMessage = async () => {
     if (!input.trim()) return;
 
@@ -36,7 +72,10 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: userMsg.content }),
+        body: JSON.stringify({
+          message: userMsg.content,
+          file_id: fileId, // RAG support
+        }),
       });
 
       const data = await res.json();
@@ -71,7 +110,6 @@ export default function Home() {
       >
         <div className="font-semibold text-lg">Aroma AI</div>
 
-        {/* Toggle Button */}
         <button
           onClick={() => setDarkMode(!darkMode)}
           className="text-sm px-3 py-1 rounded-md border"
@@ -95,28 +133,16 @@ export default function Home() {
             <div key={index}>
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                  <div
-                    className={`px-4 py-2 rounded-2xl max-w-[75%] text-sm ${
-                      darkMode
-                        ? "bg-blue-500 text-white"
-                        : "bg-blue-600 text-white"
-                    }`}
-                  >
+                  <div className="px-4 py-2 rounded-2xl max-w-[75%] text-sm bg-blue-500 text-white">
                     {msg.content}
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  {/* AI Avatar */}
-                  <div
-                    className={`w-8 h-8 flex items-center justify-center rounded-full text-sm ${
-                      darkMode ? "bg-green-500" : "bg-green-600 text-white"
-                    }`}
-                  >
+                  <div className="w-8 h-8 flex items-center justify-center rounded-full bg-green-500 text-sm">
                     🤖
                   </div>
 
-                  {/* AI Message */}
                   <div
                     className={`prose max-w-none text-sm ${
                       darkMode ? "prose-invert" : ""
@@ -152,36 +178,58 @@ export default function Home() {
           darkMode ? "bg-[#0b0f19] border-gray-800" : "bg-white border-gray-300"
         }`}
       >
-        <div
-          className={`max-w-3xl mx-auto flex items-center gap-2 rounded-full px-4 py-2 ${
-            darkMode ? "bg-[#111827]" : "bg-gray-200"
-          }`}
-        >
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Message Aroma AI..."
-            className={`flex-1 bg-transparent outline-none text-sm ${
-              darkMode
-                ? "text-white placeholder-gray-400"
-                : "text-black placeholder-gray-500"
-            }`}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          />
+        <div className="max-w-3xl mx-auto">
+          {/* FILE UPLOAD */}
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="file"
+              accept=".pdf,.txt,.docx"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="text-xs"
+            />
 
-          <button
-            onClick={sendMessage}
-            className={`px-4 py-1 rounded-full text-sm font-medium ${
-              darkMode ? "bg-white text-black" : "bg-black text-white"
+            <button
+              onClick={uploadFile}
+              className="text-xs px-2 py-1 bg-green-500 text-white rounded"
+            >
+              Upload
+            </button>
+
+            {fileId && <span className="text-xs opacity-60">Attached ✅</span>}
+          </div>
+
+          {/* CHAT INPUT */}
+          <div
+            className={`flex items-center gap-2 rounded-full px-4 py-2 ${
+              darkMode ? "bg-[#111827]" : "bg-gray-200"
             }`}
           >
-            Send
-          </button>
-        </div>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Message Aroma AI..."
+              className={`flex-1 bg-transparent outline-none text-sm ${
+                darkMode
+                  ? "text-white placeholder-gray-400"
+                  : "text-black placeholder-gray-500"
+              }`}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            />
 
-        <p className="text-xs text-center mt-2 opacity-50">
-          AI can make mistakes. Verify important information.
-        </p>
+            <button
+              onClick={sendMessage}
+              className={`px-4 py-1 rounded-full text-sm font-medium ${
+                darkMode ? "bg-white text-black" : "bg-black text-white"
+              }`}
+            >
+              Send
+            </button>
+          </div>
+
+          <p className="text-xs text-center mt-2 opacity-50">
+            AI can make mistakes. Verify important information.
+          </p>
+        </div>
       </div>
     </div>
   );

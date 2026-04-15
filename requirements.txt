@@ -5,6 +5,7 @@ uvicorn[standard]
 langchain
 langchain-openai
 langchain-community
+langchain-qdrant
 
 # OpenAI
 openai
