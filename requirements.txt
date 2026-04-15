@@ -1,0 +1,31 @@
+fastapi
+uvicorn[standard]
+
+# LangChain ecosystem
+langchain
+langchain-openai
+langchain-community
+
+# OpenAI
+openai
+
+# Env
+python-dotenv
+pydantic
+dotenv
+
+# 🔥 RAG Core
+qdrant-client
+sentence-transformers
+pypdf
+unstructured
+tiktoken
+
+# 🔥 Advanced RAG
+rank-bm25
+numpy
+scikit-learn
+whoosh
+beautifulsoup4
+httpx
+python-multipart
