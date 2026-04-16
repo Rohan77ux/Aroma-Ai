@@ -30,3 +30,9 @@ whoosh
 beautifulsoup4
 httpx
 python-multipart
+
+
+#postgress
+sqlalchemy
+psycopg2-binary
+alembic

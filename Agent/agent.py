@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from langchain_openai import ChatOpenAI , OpenAIEmbeddings
-
-from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
+
+from redis_client import get_chat_history, save_chat_history
 
 qdrant_client = QdrantClient(url="http://localhost:6333")
 
@@ -15,10 +16,6 @@ llm = ChatOpenAI(
     timeout=60,
     max_retries=2,
 )
-
-
-message = []
-
 
 systemPrompt = """
 You are an expert AI assistant named Aroma.
@@ -53,72 +50,103 @@ Follow these rules strictly:
 - Say "I don't know"
 """
 
-message.append(SystemMessage(content=systemPrompt))
-
-def retrieve_context(query, file_id):
-    """RAG retrieval from Qdrant"""
-
+# ===========================
+#  RETRIEVER (UNCHANGED)
+# ===========================
+def retrieve_context(query, session_id=None, file_id=None):
     vectorstore = QdrantVectorStore(
         client=qdrant_client,
         collection_name="docs",
         embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
     )
 
-    retriever = vectorstore.as_retriever(
-    search_type="mmr",
-    search_kwargs={
-        "k": 5,
-        "fetch_k": 10,
-        "lambda_mult": 0.5,
-        "filter": {
+    if file_id:
+        filter_condition = {
             "must": [
-                {
-                    "key": "metadata.file_id",  
-                    "match": {"value": file_id}
-                }
+                {"key": "metadata.file_id", "match": {"value": file_id}}
             ]
         }
-    }
-)
+    else:
+        filter_condition = {
+            "must": [
+                {"key": "metadata.session_id", "match": {"value": session_id}}
+            ]
+        }
+
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={
+            "k": 5,
+            "fetch_k": 10,
+            "lambda_mult": 0.5,
+            "filter": filter_condition,
+        },
+    )
 
     docs = retriever.invoke(query)
-   
-
     context = "\n\n".join([doc.page_content for doc in docs])
 
     return context
 
-def chat(msg,file_id=None):
-   
 
+# ===========================
+#  CHAT FUNCTION (FIXED)
+# ===========================
+def chat(user_msg, session_id, file_id=None):
     try:
-        
-        if file_id:
-            context = retrieve_context(msg, file_id)
+        # ✅ fresh message list every request
+        messages = [SystemMessage(content=systemPrompt)]
 
-            prompt = f"""
-You are an AI assistant.
+        # ✅ load Redis history
+        history = get_chat_history(session_id)
 
-Answer the question using the context below.
-if user query ia also give the summary or explain all the topic in detail or in short then explain.
+        # ✅ reconstruct history safely
+        for msg in history:
+            if msg["role"] == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            else:
+                messages.append(AIMessage(content=msg["content"]))
 
-If answer is not found, say "Not found in document".
+        # ================= RAG =================
+        context = ""
+        if file_id or session_id:
+            context = retrieve_context(
+                query=user_msg,
+                session_id=session_id,
+                file_id=file_id,
+            )
+
+        # ✅ Keep ORIGINAL user message safe
+        final_user_msg = user_msg
+
+        if context:
+            final_user_msg = f"""
+Answer using the context below.
+
+If user asks for summary or explanation, respond accordingly.
 
 Context:
 {context}
 
 Question:
-{msg}
+{user_msg}
 """
 
-            message.append(HumanMessage(content=prompt))
-        else:
-            message.append(HumanMessage(content=msg))  
-             
-        response = llm.invoke(message)  
-        reply = response.content        
+        # ✅ add user msg to LLM
+        messages.append(HumanMessage(content=final_user_msg))
 
-        message.append(AIMessage (content=reply) )        
+        # ✅ LLM call
+        response = llm.invoke(messages)
+        reply = response.content
+
+        # ================= MEMORY SAVE =================
+        history.append({"role": "user", "content": user_msg})  # ✅ original msg
+        history.append({"role": "ai", "content": reply})
+
+        # ✅ limit memory
+        history = history[-10:]
+
+        save_chat_history(session_id, history)
 
         return reply
 
