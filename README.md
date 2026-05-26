@@ -19,7 +19,7 @@ flowchart TD
         E[OpenAI API Calling]
         F[(Postgres)]
         G[(Redis Cache)]
-        H[(Neo4j Graph DB)]
+       
 
         D --> E
         E --> F
