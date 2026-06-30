@@ -1,3 +1,4 @@
+
 <div align="center">
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=12,20,6&height=220&section=header&text=Aroma%20AI&fontSize=70&fontColor=ffffff&animation=fadeIn&fontAlignY=38&desc=Your%20Intelligent%20Multi-Modal%20AI%20Assistant&descAlignY=58&descSize=20" />
@@ -49,6 +50,14 @@
 - 📚 **Vector Search** — Semantic document retrieval powered by Qdrant
 - 🛠️ **Tool Integrations** — Connects with third-party APIs to extend capabilities
 - ⚡ **Optimized Performance** — Redis caching and a robust Postgres backend
+
+<br/>
+
+## 🖼️ Preview
+
+<div align="center">
+  <img src="./assets/aroma-ai-preview.png" alt="Aroma AI chat interface" width="90%" />
+</div>
 
 <br/>
 
@@ -227,3 +236,5 @@ This project is licensed under the **MIT License**.
 <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=12,20,6&height=120&section=footer" />
 
 </div>
+
+
